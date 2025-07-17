@@ -11,8 +11,8 @@ genai.configure(api_key=api)
 logo = Image.open("logo.png")
 resized_logo = logo.resize((200, 150))  # Adjust width and height as needed
 
-# Display in sidebar
-
+if "history" not in st.session_state:
+        st.session_state.history = {}
 
 #dividing the space
 col1, col2 = st.columns([5, 1])
@@ -29,12 +29,12 @@ def get_carrier_guidence(prompt):
     except Exception as e:
         return f"Error is :{e}"
 def history():
-    if "history" not in st.session_state:
-        st.session_state.history = {}
-    
-    for q, a in st.session_state.hist.items():
-        st.markdown("----")
-        st.markdown(f"Question: {q} \n → Answer: {a}")
+    if not st.session_state.history:
+        st.error("History is Empty")
+    else:
+        for q, a in st.session_state.history.items():
+            st.markdown("----")
+            st.markdown(f"**Question:** {q}  \n→ **Answer:** {a}")
     
 
 #checking the api
@@ -105,9 +105,9 @@ else:
                         with st.spinner("Generating response..."):
                             result = get_carrier_guidence(prompt)
                         st.markdown(result)
-                        if "hist" not in st.session_state:
-                            st.session_state.hist = {}
-                        st.session_state.hist[question] = result
+                        if "history" not in st.session_state:
+                            st.session_state.history = {}
+                        st.session_state.history[question] = result
                         if st.sidebar.button("📖 History",type="tertiary"):
                             history()  
                             st.sidebar.markdown("---")
