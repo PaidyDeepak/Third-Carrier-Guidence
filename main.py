@@ -5,7 +5,7 @@ import os
 from PIL import Image
 
 load_dotenv()
-api=os.getenv("GOOGLE_API_KEY")
+api= st.secrets["general"]["GOOGLE_API_KEY"]
 genai.configure(api_key=api)
 # Load and resize logo
 logo = Image.open("logo.png")
