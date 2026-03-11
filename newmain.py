@@ -3,9 +3,9 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from PIL import Image
 
-# ---------------------------------------------------
+# ----------------------------------------------------
 # CONFIGURATION
-# ---------------------------------------------------
+# ----------------------------------------------------
 
 load_dotenv()
 
@@ -20,33 +20,32 @@ genai.configure(api_key=api)
 
 MODEL_NAME = "gemini-2.5-flash"
 
-
-# ---------------------------------------------------
-# SESSION STATE INITIALIZATION
-# ---------------------------------------------------
+# ----------------------------------------------------
+# SESSION INITIALIZATION
+# ----------------------------------------------------
 
 def initialize_session():
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    if "profile_saved" not in st.session_state:
-        st.session_state.profile_saved = False
+    if "profile" not in st.session_state:
+        st.session_state.profile = {}
 
-
-# ---------------------------------------------------
+# ----------------------------------------------------
 # LOAD LOGO
-# ---------------------------------------------------
+# ----------------------------------------------------
 
 def load_logo():
+
     logo = Image.open("logo.png")
     return logo.resize((200,150))
 
+# ----------------------------------------------------
+# SIDEBAR PROFILE
+# ----------------------------------------------------
 
-# ---------------------------------------------------
-# BUILD USER PROFILE
-# ---------------------------------------------------
-
-def user_profile_sidebar(logo):
+def sidebar_profile(logo):
 
     st.sidebar.image(logo)
 
@@ -64,33 +63,38 @@ def user_profile_sidebar(logo):
     )
 
     education = st.sidebar.text_input(
-        "Highest Education Received",
+        "Education",
         placeholder="B.Tech"
     )
 
     experience = st.sidebar.text_input(
         "Experience",
-        placeholder="5 years"
+        placeholder="1 year"
     )
 
-    if st.sidebar.button("Save Profile", type="primary"):
+    if st.sidebar.button("Save Profile"):
 
         if interests and skills and education and experience:
 
-            st.session_state.profile_saved = True
-            st.sidebar.success("Profile saved successfully!")
+            st.session_state.profile = {
+                "interests": interests,
+                "skills": skills,
+                "education": education,
+                "experience": experience
+            }
+
+            st.sidebar.success("Profile Saved")
 
         else:
-            st.sidebar.error("Please fill all profile fields")
+            st.sidebar.error("Please fill all fields")
 
-    return interests, skills, education, experience
-
-
-# ---------------------------------------------------
+# ----------------------------------------------------
 # BUILD PROMPT
-# ---------------------------------------------------
+# ----------------------------------------------------
 
-def build_prompt(interests, skills, education, experience, messages):
+def build_prompt(messages):
+
+    profile = st.session_state.profile
 
     conversation = ""
 
@@ -99,23 +103,22 @@ def build_prompt(interests, skills, education, experience, messages):
 
     prompt = f"""
     User Profile:
-    Interests: {interests}
-    Skills: {skills}
-    Education: {education}
-    Experience: {experience}
+    Interests: {profile.get("interests")}
+    Skills: {profile.get("skills")}
+    Education: {profile.get("education")}
+    Experience: {profile.get("experience")}
 
     Conversation History:
     {conversation}
 
-    Give career guidance based on the profile and conversation.
+    Provide career guidance based on the user's profile and chat history.
     """
 
     return prompt
 
-
-# ---------------------------------------------------
-# GENERATE RESPONSE FROM GEMINI
-# ---------------------------------------------------
+# ----------------------------------------------------
+# GEMINI RESPONSE
+# ----------------------------------------------------
 
 def generate_response(prompt):
 
@@ -131,75 +134,86 @@ def generate_response(prompt):
 
         return f"Error: {e}"
 
+# ----------------------------------------------------
+# FLOATING CHAT CSS
+# ----------------------------------------------------
 
-# ---------------------------------------------------
-# DISPLAY CHAT HISTORY
-# ---------------------------------------------------
-
-def display_chat():
-
-    for message in st.session_state.messages:
-
-        with st.chat_message(message["role"]):
-
-            st.markdown(message["content"])
-
-
-# ---------------------------------------------------
-# CHATBOT SECTION
-# ---------------------------------------------------
-
-def chatbot_ui(interests, skills, education, experience):
-
-    st.title("🎓 AI Career Guidance Assistant")
+def floating_chat_css():
 
     st.markdown(
-        "Ask career related questions and receive personalized guidance."
+    """
+    <style>
+
+    .chat-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 380px;
+        height: 500px;
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #ccc;
+        padding: 15px;
+        overflow-y: auto;
+        box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+        z-index: 999;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
     )
 
-    display_chat()
+# ----------------------------------------------------
+# FLOATING CHATBOT
+# ----------------------------------------------------
 
-    user_input = st.chat_input("Ask your career question...")
+def floating_chatbot():
 
-    if user_input:
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
-        if not st.session_state.profile_saved:
+    st.markdown("### 🤖 Career AI Assistant")
 
-            st.error("Please fill and save your profile first.")
+    for msg in st.session_state.messages:
 
-            return
+        role = "🧑 You" if msg["role"] == "user" else "🤖 AI"
 
-        # Save user message
-        st.session_state.messages.append(
-            {"role": "user", "content": user_input}
-        )
+        st.markdown(f"**{role}:** {msg['content']}")
 
-        with st.chat_message("user"):
-            st.markdown(user_input)
+    user_input = st.text_input(
+        "Type your message",
+        key="floating_input"
+    )
 
-        prompt = build_prompt(
-            interests,
-            skills,
-            education,
-            experience,
-            st.session_state.messages
-        )
+    if st.button("Send"):
 
-        with st.spinner("Generating response..."):
+        if not st.session_state.profile:
 
-            reply = generate_response(prompt)
+            st.error("Please save your profile first.")
 
-        st.session_state.messages.append(
-            {"role": "assistant", "content": reply}
-        )
+        elif user_input:
 
-        with st.chat_message("assistant"):
-            st.markdown(reply)
+            st.session_state.messages.append(
+                {"role":"user","content":user_input}
+            )
 
+            prompt = build_prompt(st.session_state.messages)
 
-# ---------------------------------------------------
+            with st.spinner("Thinking..."):
+
+                reply = generate_response(prompt)
+
+            st.session_state.messages.append(
+                {"role":"assistant","content":reply}
+            )
+
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ----------------------------------------------------
 # HISTORY TAB
-# ---------------------------------------------------
+# ----------------------------------------------------
 
 def history_tab():
 
@@ -216,37 +230,11 @@ def history_tab():
         role = "User" if msg["role"] == "user" else "Assistant"
 
         st.markdown("---")
-
         st.markdown(f"**{role}:** {msg['content']}")
 
-
-# ---------------------------------------------------
-# SAMPLE QUESTIONS
-# ---------------------------------------------------
-
-def sample_questions():
-
-    st.markdown("### Suggested Questions")
-
-    questions = [
-        "How can I become a Cloud Engineer with my background?",
-        "What career paths match my skills?",
-        "What high paying jobs can I get with my profile?",
-        "What skills should I learn next?"
-    ]
-
-    for q in questions:
-
-        if st.button(q):
-
-            st.session_state.messages.append(
-                {"role":"user","content":q}
-            )
-
-
-# ---------------------------------------------------
+# ----------------------------------------------------
 # MAIN APP
-# ---------------------------------------------------
+# ----------------------------------------------------
 
 def main():
 
@@ -254,24 +242,29 @@ def main():
 
     logo = load_logo()
 
-    interests, skills, education, experience = user_profile_sidebar(logo)
+    sidebar_profile(logo)
 
     tab1, tab2 = st.tabs(["Chatbot", "History"])
 
     with tab1:
 
-        sample_questions()
+        st.title("🎓 Generative AI Career Guidance Assistant")
 
-        chatbot_ui(interests, skills, education, experience)
+        st.markdown(
+        "Fill your profile in the sidebar and start chatting with the AI assistant."
+        )
+
+        floating_chat_css()
+
+        floating_chatbot()
 
     with tab2:
 
         history_tab()
 
-
-# ---------------------------------------------------
+# ----------------------------------------------------
 # RUN APP
-# ---------------------------------------------------
+# ----------------------------------------------------
 
 if __name__ == "__main__":
 
